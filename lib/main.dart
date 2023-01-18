@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
 import 'package:masked_text/masked_text.dart';
 import 'package:intl/intl.dart';
+import 'package:titikmoney/components/money_info_item.dart';
 import 'package:titikmoney/database.dart';
+import 'package:titikmoney/extensions/first_where-or_null.dart';
+import 'package:titikmoney/models/day_analytic_money_model.dart';
 import 'package:titikmoney/models/money_info_model.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
@@ -11,6 +14,7 @@ import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
 
 GlobalKey<_MyAppState> myApp = GlobalKey();
+bool isBeginnigSession = true;
 
 Future<void> main() async {
   Intl.defaultLocale = 'ru_RU';
@@ -65,6 +69,13 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
+class CustomPageRoute<T> extends MaterialPageRoute { // PageRouteBuilder
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 0);
+
+  CustomPageRoute({builder}) : super(builder: builder);
+}
+
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.database});
 
@@ -80,10 +91,13 @@ class _MyHomePageState extends State<MyHomePage> {
   late TextEditingController _descriptionController;
   late TextEditingController _moneyController;
   late TextEditingController _tagController;
+  late  FocusNode _moneyFocusNode;
   String operationType = 'spend';
   bool _isLoading = true;
+  final DateFormat _analyticDateFormat = DateFormat('dd MMM');
 
   final List<MoneyInfoModel> _moneyInfoModel = [];
+  final List<DayAnalyticMoneyModel> _dayAnalyticMoneyModel = [];
 
   @override
   void initState() {
@@ -92,17 +106,57 @@ class _MyHomePageState extends State<MyHomePage> {
     _descriptionController = TextEditingController();
     _moneyController = TextEditingController();
     _tagController = TextEditingController();
+    _moneyFocusNode = FocusNode();
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
+      if (isBeginnigSession) {
+        _moneyFocusNode.requestFocus();
+        isBeginnigSession = false;
+      }
       await loadMoneyInfo();
     });
   }
 
   Future loadMoneyInfo() async {
+    setState(() {
+      _isLoading = true;
+    });
     List<MoneyInfoModel> queryResult = await widget.database.moneyInfoDao.getAllMoneyInfo();
     _moneyInfoModel.clear();
     _moneyInfoModel.addAll(queryResult.reversed.toList());
+    _moneyInfoModel.sort((a,b) {
+      return b.dateTimeStamp.compareTo(a.dateTimeStamp);
+    });
+
+    // Расчеты для экрана аналитики
+    for (MoneyInfoModel element in _moneyInfoModel) {
+      String elementDate = _analyticDateFormat.format(element.dateTimeStamp);
+      DayAnalyticMoneyModel? dayAnalyticModel = _dayAnalyticMoneyModel.firstWhereOrNull((element) => element.date == elementDate);
+      if (dayAnalyticModel != null) {
+        // Такой день уже существет и его надо обновить
+        int index = _dayAnalyticMoneyModel.indexWhere((element) => element.date == elementDate);
+        _dayAnalyticMoneyModel[index].items.add(element);
+        double totalExpenses = element.operationType == 'spend' ? element.amountOfMoney : 0;
+        double totalRevenue = element.operationType == 'income' ? element.amountOfMoney : 0;
+        _dayAnalyticMoneyModel[index].totalExpenses += totalExpenses;
+        _dayAnalyticMoneyModel[index].totalRevenue += totalRevenue;
+      }
+      else {
+        // Такой день не существует и его надо создать
+        double totalExpenses = element.operationType == 'spend' ? element.amountOfMoney : 0;
+        double totalRevenue = element.operationType == 'income' ? element.amountOfMoney : 0;
+
+        final value = DayAnalyticMoneyModel(
+          date: elementDate,
+          items: [element],
+          totalExpenses: totalExpenses,
+          totalRevenue: totalRevenue
+        );
+
+        _dayAnalyticMoneyModel.add(value);
+      }
+    }
     setState(() {
       _isLoading = false;
     });
@@ -115,6 +169,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _descriptionController.dispose();
     _moneyController.dispose();
     _tagController.dispose();
+    _moneyFocusNode.dispose();
     super.dispose();
   }
 
@@ -131,13 +186,15 @@ class _MyHomePageState extends State<MyHomePage> {
               Expanded(
                 flex: 3,
                 child: Container(
-                  clipBehavior: Clip.hardEdge,
-                  height: double.infinity,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondary,
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(20), right: Radius.circular(20)),
-                    boxShadow: const [
+                  decoration: const BoxDecoration(
+                    borderRadius: BorderRadius.horizontal(left: Radius.circular(20), right: Radius.circular(20)),
+                    // color: Theme.of(context).colorScheme.secondary,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.cyan, Colors.blue]
+                    ),
+                    boxShadow: [
                       BoxShadow(
                         color: Colors.black12,
                         offset: Offset(0, 2),
@@ -146,28 +203,102 @@ class _MyHomePageState extends State<MyHomePage> {
                       )
                     ],
                   ),
-                  child: SafeArea(
-                    bottom: false,
-                    child: _isLoading 
-                      ? const Center(
-                        child: CircularProgressIndicator.adaptive(),
-                      ) 
-                      : _moneyInfoModel.isNotEmpty 
-                        ? ListView.builder(
-                            itemCount: _moneyInfoModel.length,
-                            itemBuilder: (context, index) => MoneyInfoItem(moneyInfoModel: _moneyInfoModel[index], onDelete: loadMoneyInfo)
-                          )
-                        : const Center(
-                          child: Text(
-                            'Операций пока что нет.\nДобавьте свою первую денежную операцию ниже',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
+                  // clipBehavior: Clip.hardEdge,
+                  child: PageView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      SizedBox(
+                        height: double.infinity,
+                        width: double.infinity,
+                        child: SafeArea(
+                          bottom: false,
+                          child: _isLoading 
+                            ? const Center(
+                              child: CircularProgressIndicator.adaptive(),
+                            ) 
+                            : _moneyInfoModel.isNotEmpty 
+                              ? ListView.builder(
+                                  itemCount: _moneyInfoModel.length,
+                                  itemBuilder: (context, index) => MoneyInfoItem(moneyInfoModel: _moneyInfoModel[index], onDelete: loadMoneyInfo)
+                                )
+                              : const Center(
+                                child: Text(
+                                  'Операций пока что нет.\nДобавьте свою первую денежную операцию ниже',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 16
+                                  ),
+                                ),
+                              )
+                        ),
+                      ),
+                      SizedBox(
+                        height: double.infinity,
+                        width: double.infinity,
+                        child: ListView.builder(
+                          itemCount: _dayAnalyticMoneyModel.length,
+                          itemBuilder: (context, index) => Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                            decoration: BoxDecoration(
                               color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 16
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  offset: Offset(0, 2),
+                                  blurRadius: 4,
+                                  spreadRadius: 2
+                                )
+                              ],
+                              borderRadius: BorderRadius.circular(20)
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _analyticDateFormat.format(DateTime.now()) == _dayAnalyticMoneyModel[index].date 
+                                    ? 'Сегодня' 
+                                    : _analyticDateFormat.format(DateTime.now().add(const Duration(days: -1))) == _dayAnalyticMoneyModel[index].date 
+                                      ? 'Вчера' 
+                                      : _dayAnalyticMoneyModel[index].date,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16
+                                  )
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Всего операций: ${_dayAnalyticMoneyModel[index].items.length}'
+                                ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      '-${_dayAnalyticMoneyModel[index].totalExpenses.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.w600,
+                                      )
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '+${_dayAnalyticMoneyModel[index].totalRevenue.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.w600,
+                                      )
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                        )
+                        ),
+                      )
+                    ],
                   ),
                 ),
               ),
@@ -231,6 +362,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                           flex: 2,
                                           child: TextField(
                                             controller: _moneyController,
+                                            focusNode: _moneyFocusNode,
                                             keyboardType: TextInputType.number,
                                             decoration: InputDecoration(
                                               contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 20),
@@ -369,8 +501,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                       _descriptionController.clear();
                                       _moneyController.clear();
                                       _tagController.clear();
-      
-                                      await loadMoneyInfo();
 
                                       Vibrate.feedback(FeedbackType.success);
 
@@ -379,6 +509,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                         const CustomSnackBar.success(message: "Добавлено"),
                                         dismissType: DismissType.onSwipe,
                                       );
+
+                                      Navigator.pushReplacement(context, CustomPageRoute(builder:(context) => MyHomePage(database: widget.database))); // Почему-то только так можно увидеть обновленные жанные в списе. Если реал обновить через loadMoneyInfo(), то ничего не обновляется, пока список не покрутишь
                                     },
                                     style: OutlinedButton.styleFrom(
                                       shape: RoundedRectangleBorder(
@@ -457,188 +589,6 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class MoneyInfoItem extends StatefulWidget {
-  const MoneyInfoItem({Key? key, required this.moneyInfoModel, this.onDelete}) : super(key: key);
-
-  final MoneyInfoModel moneyInfoModel;
-  final void Function()? onDelete;
-
-  @override
-  State<MoneyInfoItem> createState() => _MoneyInfoItemState();
-}
-
-class _MoneyInfoItemState extends State<MoneyInfoItem> {
-  DateFormat dateFormat = DateFormat("dd MMM");
-  DateFormat timeFormat = DateFormat("HH:mm");
-
-  final List<String> _tags = [];
-
-  @override
-  void initState() {
-    if (widget.moneyInfoModel.tags! != '') {
-      List<String> words = widget.moneyInfoModel.tags!.split(',');
-      for (var element in words) {
-        _tags.add(element.trim());
-      }
-    }
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoContextMenu(
-      actions: [
-        CupertinoContextMenuAction(
-          onPressed: () {
-            myApp.currentState!.widget.database.moneyInfoDao.deletemoneyInfo(widget.moneyInfoModel);
-            if (widget.onDelete != null) widget.onDelete!();
-            Navigator.pop(context);
-          },
-          trailingIcon: CupertinoIcons.delete,
-          isDestructiveAction: true,
-          child: const Text('Удалить'),
-        )
-      ],
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-        width: double.infinity,
-        constraints: const BoxConstraints(
-          minHeight: 40,
-          maxHeight: 100
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              offset: Offset(0, 2),
-              blurRadius: 4,
-              spreadRadius: 2
-            )
-          ],
-          borderRadius: BorderRadius.circular(20)
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.date_range
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          dateFormat.format(widget.moneyInfoModel.dateTimeStamp),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500
-                          ),
-                        ),
-                        Text(
-                          timeFormat.format(widget.moneyInfoModel.dateTimeStamp),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      CupertinoIcons.money_rubl
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(
-                      widget.moneyInfoModel.operationType == 'spend' 
-                        ? CupertinoIcons.minus
-                        : widget.moneyInfoModel.operationType == 'income'
-                          ? CupertinoIcons.plus
-                          : CupertinoIcons.question,
-                      size: 15,
-                      color: widget.moneyInfoModel.operationType == 'spend' 
-                        ? Colors.red
-                        : widget.moneyInfoModel.operationType == 'income' 
-                          ? Colors.green
-                          : Colors.black,
-                    ),
-                    Text(
-                      widget.moneyInfoModel.amountOfMoney.toStringAsFixed(0),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: widget.moneyInfoModel.operationType == 'spend' 
-                        ? Colors.red
-                        : widget.moneyInfoModel.operationType == 'income' 
-                          ? Colors.green
-                          : Colors.black,
-                        fontWeight: FontWeight.w600
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(width: 12),
-            Flexible(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.moneyInfoModel.description != null && widget.moneyInfoModel.description!.isNotEmpty) Text(
-                    widget.moneyInfoModel.description!
-                  ),
-                  if (_tags.isNotEmpty) const SizedBox(height: 6),
-                  if (_tags.isNotEmpty) Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      scrollDirection: Axis.horizontal,
-                      itemBuilder: (context, index) => Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.cyanAccent.withOpacity(.3),
-                              borderRadius: BorderRadius.circular(6)
-                            ),
-                            child: Text(
-                              _tags[index],
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      separatorBuilder:(context, index) => const SizedBox(width: 10),
-                      itemCount: _tags.length
-                    ),
-                  )
-                ],
-              ),
-            )
-          ],
         ),
       ),
     );
