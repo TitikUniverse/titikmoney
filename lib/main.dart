@@ -17,7 +17,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final database = await $FloorAppDatabase
-      .databaseBuilder('titik_money.db')
+      .databaseBuilder('titik_money_2.db')
       .build();
 
   runApp(MyApp(key: myApp, database: database));
@@ -79,6 +79,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late TextEditingController _timeController;
   late TextEditingController _descriptionController;
   late TextEditingController _moneyController;
+  late TextEditingController _tagController;
   String operationType = 'spend';
   bool _isLoading = true;
 
@@ -90,6 +91,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _timeController = TextEditingController();
     _descriptionController = TextEditingController();
     _moneyController = TextEditingController();
+    _tagController = TextEditingController();
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
@@ -112,6 +114,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _timeController.dispose();
     _descriptionController.dispose();
     _moneyController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
@@ -230,7 +233,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                             controller: _moneyController,
                                             keyboardType: TextInputType.number,
                                             decoration: InputDecoration(
-                                              contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 20),
                                               filled: true,
                                               fillColor: const Color(0xFFf3f4f9),
                                               border: OutlineInputBorder(
@@ -263,7 +266,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     mask: "##.##.####",
                                     keyboardType: TextInputType.number,
                                     decoration: InputDecoration(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
                                       filled: true,
                                       fillColor: const Color(0xFFf3f4f9),
                                       border: OutlineInputBorder(
@@ -296,7 +299,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     mask: "##:##",
                                     keyboardType: TextInputType.number,
                                     decoration: InputDecoration(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
                                       filled: true,
                                       fillColor: const Color(0xFFf3f4f9),
                                       border: OutlineInputBorder(
@@ -348,12 +351,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                         );
                                         return;
                                       }
-      
+
+                                      String tags = _tagController.text.trim();
+
                                       MoneyInfoModel moneyInfoModel = MoneyInfoModel(
                                         operationType: operationType,
                                         amountOfMoney: double.parse(_moneyController.text),
                                         dateTimeStamp: dateTime,
-                                        description: _descriptionController.text.isNotEmpty ? _descriptionController.text : ''
+                                        description: _descriptionController.text.isNotEmpty ? _descriptionController.text.trim() : '',
+                                        tags: tags
                                       );
       
                                       await widget.database.moneyInfoDao.insertMoneyInfo(moneyInfoModel);
@@ -362,6 +368,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       _timeController.clear();
                                       _descriptionController.clear();
                                       _moneyController.clear();
+                                      _tagController.clear();
       
                                       await loadMoneyInfo();
 
@@ -386,23 +393,59 @@ class _MyHomePageState extends State<MyHomePage> {
                             ),
                             const SizedBox(width: 10),
                             Flexible(
-                              child: TextField(
-                                controller: _descriptionController,
-                                maxLines: 9,
-                                decoration: InputDecoration(
-                                  // contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFf3f4f9),
-                                  border: OutlineInputBorder(
-                                    borderSide: BorderSide.none,
-                                    borderRadius: BorderRadius.circular(20)
+                              child: Column(
+                                children: [
+                                  TextField(
+                                    controller: _descriptionController,
+                                    maxLines: 4,
+                                    textCapitalization: TextCapitalization.sentences,
+                                    decoration: InputDecoration(
+                                      // contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: ),
+                                      filled: true,
+                                      fillColor: const Color(0xFFf3f4f9),
+                                      border: OutlineInputBorder(
+                                        borderSide: BorderSide.none,
+                                        borderRadius: BorderRadius.circular(20)
+                                      ),
+                                      hintText: 'Описание',
+                                      hintStyle: const TextStyle(
+                                        color: Colors.black26
+                                      ),
+                                      labelText: 'Описание'
+                                    ),
                                   ),
-                                  hintText: 'Описание',
-                                  hintStyle: const TextStyle(
-                                    color: Colors.black26
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: _tagController,
+                                    minLines: 1,
+                                    maxLines: 3,
+                                    textCapitalization: TextCapitalization.sentences,
+                                    decoration: InputDecoration(
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
+                                      filled: true,
+                                      fillColor: const Color(0xFFf3f4f9),
+                                      border: OutlineInputBorder(
+                                        borderSide: BorderSide.none,
+                                        borderRadius: BorderRadius.circular(20)
+                                      ),
+                                      hintText: 'Теги',
+                                      hintStyle: const TextStyle(
+                                        color: Colors.black26
+                                      ),
+                                      labelText: 'Теги',
+                                      prefixIcon: const Icon(
+                                        CupertinoIcons.tag
+                                      )
+                                    ),
                                   ),
-                                  labelText: 'Описание'
-                                ),
+                                  const Text(
+                                    'Вводите через запятую',
+                                    style: TextStyle(
+                                      color: Colors.black45,
+                                      fontSize: 12
+                                    ),
+                                  )
+                                ],
                               ),
                             )
                           ],
@@ -434,6 +477,19 @@ class _MoneyInfoItemState extends State<MoneyInfoItem> {
   DateFormat dateFormat = DateFormat("dd MMM");
   DateFormat timeFormat = DateFormat("HH:mm");
 
+  final List<String> _tags = [];
+
+  @override
+  void initState() {
+    if (widget.moneyInfoModel.tags! != '') {
+      List<String> words = widget.moneyInfoModel.tags!.split(',');
+      for (var element in words) {
+        _tags.add(element.trim());
+      }
+    }
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoContextMenu(
@@ -451,8 +507,12 @@ class _MoneyInfoItemState extends State<MoneyInfoItem> {
       ],
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
         width: double.infinity,
+        constraints: const BoxConstraints(
+          minHeight: 40,
+          maxHeight: 100
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: const [
@@ -522,7 +582,7 @@ class _MoneyInfoItemState extends State<MoneyInfoItem> {
                           : Colors.black,
                     ),
                     Text(
-                      '350',
+                      widget.moneyInfoModel.amountOfMoney.toStringAsFixed(0),
                       style: TextStyle(
                         fontSize: 14,
                         color: widget.moneyInfoModel.operationType == 'spend' 
@@ -540,8 +600,42 @@ class _MoneyInfoItemState extends State<MoneyInfoItem> {
             const SizedBox(width: 12),
             Flexible(
               flex: 3,
-              child: Text(
-                widget.moneyInfoModel.description ?? ''
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.moneyInfoModel.description != null && widget.moneyInfoModel.description!.isNotEmpty) Text(
+                    widget.moneyInfoModel.description!
+                  ),
+                  if (_tags.isNotEmpty) const SizedBox(height: 6),
+                  if (_tags.isNotEmpty) Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      scrollDirection: Axis.horizontal,
+                      itemBuilder: (context, index) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.cyanAccent.withOpacity(.3),
+                              borderRadius: BorderRadius.circular(6)
+                            ),
+                            child: Text(
+                              _tags[index],
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      separatorBuilder:(context, index) => const SizedBox(width: 10),
+                      itemCount: _tags.length
+                    ),
+                  )
+                ],
               ),
             )
           ],

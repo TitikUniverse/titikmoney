@@ -69,7 +69,7 @@ class _$AppDatabase extends AppDatabase {
     Callback? callback,
   ]) async {
     final databaseOptions = sqflite.OpenDatabaseOptions(
-      version: 1,
+      version: 2,
       onConfigure: (database) async {
         await database.execute('PRAGMA foreign_keys = ON');
         await callback?.onConfigure?.call(database);
@@ -85,7 +85,7 @@ class _$AppDatabase extends AppDatabase {
       },
       onCreate: (database, version) async {
         await database.execute(
-            'CREATE TABLE IF NOT EXISTS `MoneyInfoModel` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `operationType` TEXT NOT NULL, `amountOfMoney` REAL NOT NULL, `dateTimeStamp` TEXT NOT NULL, `description` TEXT)');
+            'CREATE TABLE IF NOT EXISTS `MoneyInfoModel` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `operationType` TEXT NOT NULL, `amountOfMoney` REAL NOT NULL, `dateTimeStamp` TEXT NOT NULL, `description` TEXT, `tags` TEXT)');
 
         await callback?.onCreate?.call(database, version);
       },
@@ -113,7 +113,8 @@ class _$MoneyInfoDao extends MoneyInfoDao {
                   'amountOfMoney': item.amountOfMoney,
                   'dateTimeStamp':
                       _dateTimeConverter.encode(item.dateTimeStamp),
-                  'description': item.description
+                  'description': item.description,
+                  'tags': item.tags
                 },
             changeListener),
         _moneyInfoModelDeletionAdapter = DeletionAdapter(
@@ -126,7 +127,8 @@ class _$MoneyInfoDao extends MoneyInfoDao {
                   'amountOfMoney': item.amountOfMoney,
                   'dateTimeStamp':
                       _dateTimeConverter.encode(item.dateTimeStamp),
-                  'description': item.description
+                  'description': item.description,
+                  'tags': item.tags
                 },
             changeListener);
 
@@ -149,7 +151,8 @@ class _$MoneyInfoDao extends MoneyInfoDao {
             amountOfMoney: row['amountOfMoney'] as double,
             dateTimeStamp:
                 _dateTimeConverter.decode(row['dateTimeStamp'] as String),
-            description: row['description'] as String?));
+            description: row['description'] as String?,
+            tags: row['tags'] as String?));
   }
 
   @override
@@ -162,7 +165,8 @@ class _$MoneyInfoDao extends MoneyInfoDao {
             amountOfMoney: row['amountOfMoney'] as double,
             dateTimeStamp:
                 _dateTimeConverter.decode(row['dateTimeStamp'] as String),
-            description: row['description'] as String?),
+            description: row['description'] as String?,
+            tags: row['tags'] as String?),
         arguments: [id],
         queryableName: 'MoneyInfoModel',
         isView: false);

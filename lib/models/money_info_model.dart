@@ -8,6 +8,7 @@ class MoneyInfoModel {
   final double amountOfMoney;
   final DateTime dateTimeStamp;
   final String? description;
+  final String? tags;
 
-  MoneyInfoModel({this.id, required this.operationType, required this.amountOfMoney, required this.dateTimeStamp, this.description});
+  MoneyInfoModel({this.id, required this.operationType, required this.amountOfMoney, required this.dateTimeStamp, this.description, this.tags});
 }
