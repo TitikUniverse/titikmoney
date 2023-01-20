@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
 import 'package:masked_text/masked_text.dart';
 import 'package:intl/intl.dart';
+import 'package:titikmoney/components/analytic_item.dart';
 import 'package:titikmoney/components/money_info_item.dart';
 import 'package:titikmoney/database.dart';
 import 'package:titikmoney/extensions/first_where-or_null.dart';
@@ -206,6 +207,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   // clipBehavior: Clip.hardEdge,
                   child: PageView(
                     scrollDirection: Axis.horizontal,
+                    physics: const ClampingScrollPhysics(),
                     children: [
                       SizedBox(
                         height: double.infinity,
@@ -216,12 +218,8 @@ class _MyHomePageState extends State<MyHomePage> {
                             ? const Center(
                               child: CircularProgressIndicator.adaptive(),
                             ) 
-                            : _moneyInfoModel.isNotEmpty 
-                              ? ListView.builder(
-                                  itemCount: _moneyInfoModel.length,
-                                  itemBuilder: (context, index) => MoneyInfoItem(moneyInfoModel: _moneyInfoModel[index], onDelete: loadMoneyInfo)
-                                )
-                              : const Center(
+                            : _moneyInfoModel.isEmpty 
+                              ? const Center(
                                 child: Text(
                                   'Операций пока что нет.\nДобавьте свою первую денежную операцию ниже',
                                   textAlign: TextAlign.center,
@@ -232,70 +230,27 @@ class _MyHomePageState extends State<MyHomePage> {
                                   ),
                                 ),
                               )
+                              : ListView.builder(
+                                itemCount: _moneyInfoModel.length,
+                                itemBuilder: (context, index) => MoneyInfoItem(moneyInfoModel: _moneyInfoModel[index], onDelete: loadMoneyInfo)
+                              )
                         ),
                       ),
                       SizedBox(
                         height: double.infinity,
                         width: double.infinity,
-                        child: ListView.builder(
-                          itemCount: _dayAnalyticMoneyModel.length,
-                          itemBuilder: (context, index) => Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-                            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  offset: Offset(0, 2),
-                                  blurRadius: 4,
-                                  spreadRadius: 2
-                                )
-                              ],
-                              borderRadius: BorderRadius.circular(20)
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _analyticDateFormat.format(DateTime.now()) == _dayAnalyticMoneyModel[index].date 
-                                    ? 'Сегодня' 
-                                    : _analyticDateFormat.format(DateTime.now().add(const Duration(days: -1))) == _dayAnalyticMoneyModel[index].date 
-                                      ? 'Вчера' 
-                                      : _dayAnalyticMoneyModel[index].date,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16
-                                  )
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Всего операций: ${_dayAnalyticMoneyModel[index].items.length}'
-                                ),
-                                Row(
-                                  children: [
-                                    Text(
-                                      '-${_dayAnalyticMoneyModel[index].totalExpenses.toStringAsFixed(0)}',
-                                      style: const TextStyle(
-                                        color: Colors.red,
-                                        fontWeight: FontWeight.w600,
-                                      )
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '+${_dayAnalyticMoneyModel[index].totalRevenue.toStringAsFixed(0)}',
-                                      style: const TextStyle(
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.w600,
-                                      )
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                        child: _dayAnalyticMoneyModel.isEmpty
+                        ? const Center(
+                          child: Text(
+                            'Тут будет аналитика по дням'
                           ),
+                        )
+                        : ListView.builder(
+                          itemCount: _dayAnalyticMoneyModel.length,
+                          itemBuilder: (context, index) => Hero(
+                            tag: 'date_${_dayAnalyticMoneyModel[index].date}',
+                            child: AnalyticItem(analyticMoneyModel: _dayAnalyticMoneyModel[index])
+                          )
                         ),
                       )
                     ],
