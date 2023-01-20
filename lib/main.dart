@@ -93,12 +93,14 @@ class _MyHomePageState extends State<MyHomePage> {
   late TextEditingController _moneyController;
   late TextEditingController _tagController;
   late  FocusNode _moneyFocusNode;
+  late FocusNode _tagFocusNode;
   String operationType = 'spend';
   bool _isLoading = true;
   final DateFormat _analyticDateFormat = DateFormat('dd MMM');
 
   final List<MoneyInfoModel> _moneyInfoModel = [];
   final List<DayAnalyticMoneyModel> _dayAnalyticMoneyModel = [];
+  final List<String> _availableTags = [];
 
   @override
   void initState() {
@@ -108,6 +110,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _moneyController = TextEditingController();
     _tagController = TextEditingController();
     _moneyFocusNode = FocusNode();
+    _tagFocusNode = FocusNode();
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
@@ -117,6 +120,17 @@ class _MyHomePageState extends State<MyHomePage> {
       }
       await loadMoneyInfo();
     });
+  }
+
+  /// Выборка всех доступных тегов в один список
+  void updateAvailableTags() {
+    for (MoneyInfoModel item in _moneyInfoModel) {
+      List<String> tags = item.tags!.isNotEmpty ? item.tags!.split(',') : [];
+      for (int i = 0; i < tags.length; i++) {
+        String? findedTag = _availableTags.firstWhereOrNull((element) => element.toLowerCase() == tags[i].trim().toLowerCase());
+        if (findedTag == null) _availableTags.add(tags[i].trim());
+      }
+    }
   }
 
   Future loadMoneyInfo() async {
@@ -129,6 +143,8 @@ class _MyHomePageState extends State<MyHomePage> {
     _moneyInfoModel.sort((a,b) {
       return b.dateTimeStamp.compareTo(a.dateTimeStamp);
     });
+
+    updateAvailableTags();
 
     // Расчеты для экрана аналитики
     for (MoneyInfoModel element in _moneyInfoModel) {
@@ -171,11 +187,13 @@ class _MyHomePageState extends State<MyHomePage> {
     _moneyController.dispose();
     _tagController.dispose();
     _moneyFocusNode.dispose();
+    _tagFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    List<Widget> recomendedTags = createRecomendedTags();
     return Scaffold(
       body: KeyboardDismisser(
         gestures: const [GestureType.onTap, GestureType.onPanUpdateDownDirection],
@@ -369,6 +387,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                           String month = now.month.toString().length == 1 ? '0${now.month.toString()}' : now.month.toString();
                                           String date = '$day.$month.${now.year}';
                                           _dateController.text = date;
+                                          _dateController.selection = TextSelection.fromPosition(
+                                            TextPosition(offset: _dateController.text.length),
+                                          );
                                         },
                                         borderRadius: BorderRadius.circular(50),
                                         child: const Icon(
@@ -402,6 +423,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                           String minute = now.minute.toString().length == 1 ? '0${now.minute.toString()}' : now.minute.toString();
                                           String time = '$hour:$minute';
                                           _timeController.text = time;
+                                          _timeController.selection = TextSelection.fromPosition(
+                                            TextPosition(offset: _timeController.text.length),
+                                          );
                                         },
                                         borderRadius: BorderRadius.circular(50),
                                         child: const Icon(
@@ -499,27 +523,40 @@ class _MyHomePageState extends State<MyHomePage> {
                                     ),
                                   ),
                                   const SizedBox(height: 10),
-                                  TextField(
-                                    controller: _tagController,
-                                    minLines: 1,
-                                    maxLines: 3,
-                                    textCapitalization: TextCapitalization.sentences,
-                                    decoration: InputDecoration(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
-                                      filled: true,
-                                      fillColor: const Color(0xFFf3f4f9),
-                                      border: OutlineInputBorder(
-                                        borderSide: BorderSide.none,
-                                        borderRadius: BorderRadius.circular(20)
+                                  Focus(
+                                    onFocusChange: (hasFocus) {
+                                      setState(() {
+                                        // Нужно чтобы перерисовался bottomNavBar, он зависит от фокуса
+                                      });
+                                    },
+                                    child: TextField(
+                                      controller: _tagController,
+                                      focusNode: _tagFocusNode,
+                                      minLines: 1,
+                                      maxLines: 3,
+                                      textCapitalization: TextCapitalization.sentences,
+                                      decoration: InputDecoration(
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
+                                        filled: true,
+                                        fillColor: const Color(0xFFf3f4f9),
+                                        border: OutlineInputBorder(
+                                          borderSide: BorderSide.none,
+                                          borderRadius: BorderRadius.circular(20)
+                                        ),
+                                        hintText: 'Теги',
+                                        hintStyle: const TextStyle(
+                                          color: Colors.black26
+                                        ),
+                                        labelText: 'Теги',
+                                        prefixIcon: const Icon(
+                                          CupertinoIcons.tag
+                                        )
                                       ),
-                                      hintText: 'Теги',
-                                      hintStyle: const TextStyle(
-                                        color: Colors.black26
-                                      ),
-                                      labelText: 'Теги',
-                                      prefixIcon: const Icon(
-                                        CupertinoIcons.tag
-                                      )
+                                      onChanged: (value) {
+                                        setState(() {
+                                          // Обновляет фильтр ввода и перезагружает список слов
+                                        });
+                                      },
                                     ),
                                   ),
                                   const Text(
@@ -543,6 +580,69 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ),
       ),
+      bottomNavigationBar: _tagFocusNode.hasFocus ? Container(
+        width: double.infinity,
+        height: 50,
+        margin: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        decoration: BoxDecoration(
+          color: Colors.cyan.withOpacity(.1)
+        ),
+        child: recomendedTags.isEmpty 
+        ? const Center(
+          child: Text(
+            'Добавьте хотя бы один тег, чтобы сормировались подсказки'
+          ),
+        )
+        : SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: recomendedTags
+          ),
+        )
+      ) : null
     );
+  }
+
+  List<Widget> createRecomendedTags() {
+    List<Widget> value = [];
+
+    for (int i = 0; i < _availableTags.length; i++) {
+      List<String> enteredTags = _tagController.text.split(',');
+      String lastTag = enteredTags.last.trim();
+
+      if (_availableTags[i].toLowerCase().contains(lastTag.toLowerCase()) == false) continue;
+      Widget widget = InkWell(
+        onTap: () {
+          setState(() {
+            _tagController.text = _tagController.text + _availableTags[i];
+            _tagController.selection = TextSelection.fromPosition(
+              TextPosition(offset: _tagController.text.length),
+            );
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.cyanAccent.withOpacity(.3),
+            borderRadius: BorderRadius.circular(6)
+          ),
+          child: Text(
+            _availableTags[i],
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 14,
+              fontWeight: FontWeight.w600
+            ),
+          ),
+        ),
+      );
+
+      value.add(widget);
+
+      if (i < _availableTags.length) value.add(const SizedBox(width: 10));
+    }
+
+    return value;
   }
 }
