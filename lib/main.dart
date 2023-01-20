@@ -10,6 +10,7 @@ import 'package:titikmoney/extensions/first_where-or_null.dart';
 import 'package:titikmoney/models/day_analytic_money_model.dart';
 import 'package:titikmoney/models/money_info_model.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:titikmoney/screens/view_analytic_screen.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
@@ -264,7 +265,12 @@ class _MyHomePageState extends State<MyHomePage> {
                           itemCount: _dayAnalyticMoneyModel.length,
                           itemBuilder: (context, index) => Hero(
                             tag: 'date_${_dayAnalyticMoneyModel[index].date}',
-                            child: AnalyticItem(analyticMoneyModel: _dayAnalyticMoneyModel[index])
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.push(context, MaterialPageRoute(builder:(context) => ViewAnalyticScreen(analyticMoneyModel: _dayAnalyticMoneyModel[index])));
+                              },
+                              child: AnalyticItem(analyticMoneyModel: _dayAnalyticMoneyModel[index])
+                            )
                           )
                         ),
                       )
