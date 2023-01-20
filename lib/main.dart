@@ -212,29 +212,26 @@ class _MyHomePageState extends State<MyHomePage> {
                       SizedBox(
                         height: double.infinity,
                         width: double.infinity,
-                        child: SafeArea(
-                          bottom: false,
-                          child: _isLoading 
+                        child: _isLoading 
+                          ? const Center(
+                            child: CircularProgressIndicator.adaptive(),
+                          ) 
+                          : _moneyInfoModel.isEmpty 
                             ? const Center(
-                              child: CircularProgressIndicator.adaptive(),
-                            ) 
-                            : _moneyInfoModel.isEmpty 
-                              ? const Center(
-                                child: Text(
-                                  'Операций пока что нет.\nДобавьте свою первую денежную операцию ниже',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 16
-                                  ),
+                              child: Text(
+                                'Операций пока что нет.\nДобавьте свою первую денежную операцию ниже',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16
                                 ),
-                              )
-                              : ListView.builder(
-                                itemCount: _moneyInfoModel.length,
-                                itemBuilder: (context, index) => MoneyInfoItem(moneyInfoModel: _moneyInfoModel[index], onDelete: loadMoneyInfo)
-                              )
-                        ),
+                              ),
+                            )
+                            : ListView.builder(
+                              itemCount: _moneyInfoModel.length,
+                              itemBuilder: (context, index) => MoneyInfoItem(moneyInfoModel: _moneyInfoModel[index], onDelete: loadMoneyInfo)
+                            ),
                       ),
                       SizedBox(
                         height: double.infinity,

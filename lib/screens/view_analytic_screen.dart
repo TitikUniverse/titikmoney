@@ -23,6 +23,7 @@ class _ViewAnalyticScreenState extends State<ViewAnalyticScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
+        bottom: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
           child: Column(
@@ -42,11 +43,13 @@ class _ViewAnalyticScreenState extends State<ViewAnalyticScreen> {
                   ),
                 ),
               ),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const ClampingScrollPhysics(),
-                itemCount: widget.analyticMoneyModel.items.length,
-                itemBuilder: (context, index) => MoneyInfoItem(moneyInfoModel: widget.analyticMoneyModel.items[index]),
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: widget.analyticMoneyModel.items.length,
+                  itemBuilder: (context, index) => MoneyInfoItem(moneyInfoModel: widget.analyticMoneyModel.items[index]),
+                ),
               )
             ],
           ),
